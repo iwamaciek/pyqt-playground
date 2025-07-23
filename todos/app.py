@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QListView, QLineEdit, QCalendarWidget, QLabel, QDialog
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, QWidget, QListView, QTableView, QLineEdit, QCalendarWidget, QLabel, QDialog
 import PyQt5.QtCore as QtCore
 import PyQt5.QtGui as QtGui
 import sys
@@ -27,7 +27,7 @@ class TodoModel(QtCore.QAbstractListModel):
     def data(self, index, role):
         if role == QtCore.Qt.DisplayRole:
             todo = self.todos[index.row()]
-            return f"{todo.text} {' - Due by ' + todo.due_date.strftime('%Y-%m-%d') if todo.due_date else ''}"
+            return f"{todo.text} {' - Due by ' + todo.due_date.toString(QtCore.Qt.ISODate) if todo.due_date else ''}"
         elif role == QtCore.Qt.DecorationRole:
             todo = self.todos[index.row()]
             if todo.completed:
@@ -73,16 +73,57 @@ class TodoEditor(QDialog):
         self.cancel_button = QPushButton("Cancel", self)
         self.cancel_button.clicked.connect(self.reject)
 
+        self.calendar = QCalendarWidget(self)
+        self.calendar.setGridVisible(True)
+        self.calendar.setSelectionMode(QCalendarWidget.SingleSelection)
+        self.date_confirm_button = QPushButton("Set Due Date", self)
+        self.date_remove_button = QPushButton("Remove Due Date")
+        self.due_date = todo.due_date
+        if self.due_date:
+            self.calendar.setSelectedDate(self.due_date)
+        self.date_confirm_button.clicked.connect(self.confirm_due_date)
+        self.date_remove_button.clicked.connect(self.remove_due_date)
+
+        self.date_label = QLabel("Due Date:", self)
+        if self.due_date:
+            self.date_label.setText(f"Due Date: {self.due_date.toString(QtCore.Qt.ISODate)}")
+        else:
+            self.date_label.setText("Due Date: None")
+
         layout = QVBoxLayout()
         layout.addWidget(self.todo_input)
-        sublayout = QHBoxLayout()
-        sublayout.addWidget(self.save_button)
-        sublayout.addWidget(self.cancel_button)
-        layout.addLayout(sublayout)
+        layout.addWidget(self.calendar)
+        layout.addWidget(self.date_label)
+        sublayout1 = QHBoxLayout()
+        sublayout1.addWidget(self.date_confirm_button)
+        sublayout1.addWidget(self.date_remove_button)
+        layout.addLayout(sublayout1)
+        sublayout2 = QHBoxLayout()
+        sublayout2.addWidget(self.save_button)
+        sublayout2.addWidget(self.cancel_button)
+        layout.addLayout(sublayout2)
         self.setLayout(layout)
 
     def get_todo_text(self):
         return self.todo_input.text().strip()
+    
+    def get_due_date(self):
+        return self.due_date
+    
+    def confirm_due_date(self):
+        selected_date = self.calendar.selectedDate()
+        if selected_date.isValid():
+            self.due_date = selected_date
+            self.date_label.setText(f"Due Date: {self.due_date.toString(QtCore.Qt.ISODate)}")
+        else:
+            self.due_date = None
+            self.date_label.setText("Due Date: None")
+
+    def remove_due_date(self):
+        self.due_date = None
+        self.calendar.setSelectedDate(QtCore.QDate())
+        self.date_label.setText("Due Date: None")
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -90,6 +131,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Todo")
 
         self.todo_list = QListView()
+        self.todo_table = QTableView()
         self.todo_input = QLineEdit()
         self.todo_input.setPlaceholderText("Enter a new todo item here")
         self.calendar_display = QCalendarWidget()
@@ -104,6 +146,7 @@ class MainWindow(QMainWindow):
         
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.todo_list)
+        # main_layout.addWidget(self.todo_table)
         sublayout = QHBoxLayout()
         sublayout.addWidget(self.complete_button)
         sublayout.addWidget(self.edit_button)
@@ -122,7 +165,9 @@ class MainWindow(QMainWindow):
         self.model = TodoModel(todos=[Todo("Sample Todo 1"), Todo("Sample Todo 2")])
         self.load_todos()
         self.todo_list.setModel(self.model)
-        self.todo_list.setSelectionMode(QListView.MultiSelection)
+        self.todo_list.setSelectionMode(QListView.SingleSelection)
+        self.todo_table.setModel(self.model)
+        self.todo_table.setSelectionMode(QTableView.SingleSelection)
 
         self.select_date_button.clicked.connect(self.select_due_date)
         self.add_button.clicked.connect(self.add_todo)
@@ -171,10 +216,10 @@ class MainWindow(QMainWindow):
                 if new_text:
                     todo.text = new_text
                     self.model.dataChanged.emit(index, index)
-                else:
-                    pass  # Ignore empty edits
-            else:
-                pass  # Ignore cancelled edits
+                new_due_date = editor.get_due_date()
+                if new_due_date:
+                    todo.due_date = new_due_date
+                    self.model.dataChanged.emit(index, index)
 
     def complete_todo(self):
         indexes = self.todo_list.selectedIndexes()
