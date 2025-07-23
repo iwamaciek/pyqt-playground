@@ -19,25 +19,62 @@ class Todo:
     def set_due_date(self, date):
         self.due_date = date
 
-class TodoModel(QtCore.QAbstractListModel):
+# class TodoModel(QtCore.QAbstractListModel):
+#     def __init__(self, *args, todos=None, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         self.todos = todos or []
+
+#     def data(self, index, role):
+#         if role == QtCore.Qt.DisplayRole:
+#             todo = self.todos[index.row()]
+#             return f"{todo.text} {' - Due by ' + todo.due_date.toString(QtCore.Qt.ISODate) if todo.due_date else ''}"
+#         elif role == QtCore.Qt.DecorationRole:
+#             todo = self.todos[index.row()]
+#             if todo.completed:
+#                 return tick
+#             else:
+#                 return cross
+        
+#     def rowCount(self, index):
+#         return len(self.todos)
+
+class TodoModel(QtCore.QAbstractTableModel):
     def __init__(self, *args, todos=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.todos = todos or []
+        self.horizontal_header_labels = ["Todo", "Due Date"]
 
     def data(self, index, role):
         if role == QtCore.Qt.DisplayRole:
             todo = self.todos[index.row()]
-            return f"{todo.text} {' - Due by ' + todo.due_date.toString(QtCore.Qt.ISODate) if todo.due_date else ''}"
+            if index.column() == 0:
+                return todo.text
+            elif index.column() == 1:
+                if todo.due_date:
+                    return todo.due_date.toString(QtCore.Qt.ISODate)
+                else:
+                    return "No Due Date"
         elif role == QtCore.Qt.DecorationRole:
             todo = self.todos[index.row()]
-            if todo.completed:
-                return tick
-            else:
-                return cross
+            if index.column() == 0:
+                if todo.completed:
+                    return tick
+                else:
+                    return cross
         
     def rowCount(self, index):
         return len(self.todos)
     
+    def columnCount(self, index):
+        return 2
+    
+    def headerData(self, section, orientation, role):
+        if role == QtCore.Qt.DisplayRole:
+            if orientation == QtCore.Qt.Horizontal:
+                return self.horizontal_header_labels[section]
+            elif orientation == QtCore.Qt.Vertical:
+                return "No." + str(section + 1)
+
 class CalendarDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -145,8 +182,8 @@ class MainWindow(QMainWindow):
         self.delete_button = QPushButton("Delete")
         
         main_layout = QVBoxLayout()
-        main_layout.addWidget(self.todo_list)
-        # main_layout.addWidget(self.todo_table)
+        # main_layout.addWidget(self.todo_list)
+        main_layout.addWidget(self.todo_table)
         sublayout = QHBoxLayout()
         sublayout.addWidget(self.complete_button)
         sublayout.addWidget(self.edit_button)
@@ -200,14 +237,15 @@ class MainWindow(QMainWindow):
     def add_todo(self):
         text = self.todo_input.text().strip()
         if text:
-            new_todo = Todo(text)
+            new_todo = Todo(text, due_date=self.selected_date)
             self.model.todos.append(new_todo)
             self.model.layoutChanged.emit()
             self.todo_input.clear()
             self.save_todos()
 
     def edit_todo(self):
-        indexes = self.todo_list.selectedIndexes()
+        # indexes = self.todo_list.selectedIndexes()
+        indexes = self.todo_table.selectedIndexes()
         for index in indexes:
             todo = self.model.todos[index.row()]
             editor = TodoEditor(todo, self)
@@ -222,20 +260,24 @@ class MainWindow(QMainWindow):
                     self.model.dataChanged.emit(index, index)
 
     def complete_todo(self):
-        indexes = self.todo_list.selectedIndexes()
+        # indexes = self.todo_list.selectedIndexes()
+        indexes = self.todo_table.selectedIndexes()
         for index in indexes:
             todo = self.model.todos[index.row()]
             todo.toggle()
             self.model.dataChanged.emit(index, index)
-        self.todo_list.clearSelection()
+        # self.todo_list.clearSelection()
+        self.todo_table.clearSelection()
         self.save_todos()
 
     def delete_todo(self):
-        indexes = self.todo_list.selectedIndexes()
+        # indexes = self.todo_list.selectedIndexes()
+        indexes = self.todo_table.selectedIndexes()
         for index in sorted(indexes, reverse=True):
             del self.model.todos[index.row()]
         self.model.layoutChanged.emit()
-        self.todo_list.clearSelection()
+        # self.todo_list.clearSelection()
+        self.todo_table.clearSelection()
         self.save_todos()
 
     def load_todos(self):
@@ -243,7 +285,7 @@ class MainWindow(QMainWindow):
         try:
             with open('todos.json', 'r') as f:
                 todos_data = json.load(f)
-                self.model.todos = [Todo(todo['text'], todo['completed']) for todo in todos_data]
+                self.model.todos = [Todo(todo['text'], todo['completed'], todo['due_date']) for todo in todos_data]
                 for todo in self.model.todos:
                     if todo.due_date:
                         self.mark_date(todo.due_date)
@@ -252,7 +294,9 @@ class MainWindow(QMainWindow):
 
     def save_todos(self):
         # Save todos to a json file
-        todos_data = [{'text': todo.text, 'completed': todo.completed} for todo in self.model.todos]
+        todos_data = [{'text': todo.text, 'completed': todo.completed, 'due_date': todo.due_date} for todo in self.model.todos]
+        for i in range(len(self.model.todos)):
+            print(self.model.todos[i].due_date)
         with open('todos.json', 'w') as f:
             json.dump(todos_data, f)
 
