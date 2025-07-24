@@ -8,6 +8,7 @@ from todo import Todo
 from todo_model import TodoModel
 from calendar_dialog import CalendarDialog
 from todo_editor import TodoEditor
+from calendar_view import CalendarView, CalendarModel
 
 tick = QtGui.QColor("green")
 cross = QtGui.QColor("red")
@@ -17,13 +18,10 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Todo")
 
-        self.todo_list = QListView()
         self.todo_table = QTableView()
         self.todo_input = QLineEdit()
         self.todo_input.setPlaceholderText("Enter a new todo item here")
-        self.calendar_display = QCalendarWidget()
-        self.calendar_display.setGridVisible(True)
-        self.calendar_display.setSelectionMode(QCalendarWidget.NoSelection)
+        self.calendar_display = CalendarView()
         self.selected_date = None
         self.select_date_button = QPushButton("Select Due Date")
         self.add_button = QPushButton("Add Todo")
@@ -32,7 +30,6 @@ class MainWindow(QMainWindow):
         self.delete_button = QPushButton("Delete")
         
         main_layout = QVBoxLayout()
-        # main_layout.addWidget(self.todo_list)
         main_layout.addWidget(self.todo_table)
         sublayout = QHBoxLayout()
         sublayout.addWidget(self.complete_button)
@@ -51,10 +48,12 @@ class MainWindow(QMainWindow):
 
         self.model = TodoModel(todos=[Todo("Sample Todo 1"), Todo("Sample Todo 2")])
         self.load_todos()
-        self.todo_list.setModel(self.model)
-        self.todo_list.setSelectionMode(QListView.SingleSelection)
         self.todo_table.setModel(self.model)
         self.todo_table.setSelectionMode(QTableView.SingleSelection)
+
+        self.calendar_data = self.get_calendar_data()
+        self.calendar_model = CalendarModel(self.calendar_data)
+        self.calendar_display.setModel(self.calendar_model)
 
         self.select_date_button.clicked.connect(self.select_due_date)
         self.add_button.clicked.connect(self.add_todo)
@@ -62,17 +61,15 @@ class MainWindow(QMainWindow):
         self.edit_button.clicked.connect(self.edit_todo)
         self.delete_button.clicked.connect(self.delete_todo)
 
-    def mark_date(self, date, status=True):
-        format = QtGui.QTextCharFormat()
-        if status:
-            format.setBackground(QtGui.QColor("lightgreen"))
-        else:
-            format.setBackground(QtGui.QColor("lightcoral"))
-        # format.setBackground(QtGui.QColor("yellow"))
-        format.setForeground(QtGui.QColor("black"))
-        format.setFontWeight(QtGui.QFont.Bold)
-        self.calendar_display.setDateTextFormat(date, format)
-        # print(f"Marked date {date.toString(QtCore.Qt.ISODate)} as {status}")
+    def get_calendar_data(self):
+        calendar_data = {}
+        for todo in self.model.todos:
+            if todo.due_date:
+                date_str = todo.due_date.toString(QtCore.Qt.ISODate)
+                if date_str not in calendar_data.keys():
+                    calendar_data[date_str] = []
+                calendar_data[date_str].append(todo.completed)
+        return calendar_data
 
     def select_due_date(self):
         dialog = CalendarDialog(self)
@@ -95,6 +92,8 @@ class MainWindow(QMainWindow):
             new_todo = Todo(text, due_date=self.selected_date)
             self.model.todos.append(new_todo)
             self.model.layoutChanged.emit()
+            self.calendar_model.add_event(self.selected_date.toString(QtCore.Qt.ISODate), new_todo.completed)
+            self.calendar_display.refresh()
             self.todo_input.clear()
             self.save_todos()
             self.selected_date = None
@@ -113,17 +112,23 @@ class MainWindow(QMainWindow):
                     self.model.dataChanged.emit(index, index)
                 new_due_date = editor.get_due_date()
                 if new_due_date:
+                    if todo.due_date:
+                        self.calendar_model.remove_event(todo.due_date.toString(QtCore.Qt.ISODate), todo.completed)
                     todo.due_date = new_due_date
                     self.model.dataChanged.emit(index, index)
+                    self.calendar_model.add_event(new_due_date.toString(QtCore.Qt.ISODate), todo.completed)
+                    self.calendar_display.refresh()
 
     def complete_todo(self):
-        # indexes = self.todo_list.selectedIndexes()
         indexes = self.todo_table.selectedIndexes()
         for index in indexes:
             todo = self.model.todos[index.row()]
             todo.toggle()
             self.model.dataChanged.emit(index, index)
-        # self.todo_list.clearSelection()
+            if todo.due_date:
+                self.calendar_model.remove_event(todo.due_date.toString(QtCore.Qt.ISODate), not todo.completed)
+                self.calendar_model.add_event(todo.due_date.toString(QtCore.Qt.ISODate), todo.completed)
+                self.calendar_display.refresh()
         self.todo_table.clearSelection()
         self.save_todos()
 
@@ -131,6 +136,10 @@ class MainWindow(QMainWindow):
         # indexes = self.todo_list.selectedIndexes()
         indexes = self.todo_table.selectedIndexes()
         for index in sorted(indexes, reverse=True):
+            todo = self.model.todos[index.row()]
+            if todo.due_date:
+                self.calendar_model.remove_event(todo.due_date.toString(QtCore.Qt.ISODate), todo.completed)
+                self.calendar_display.refresh()
             del self.model.todos[index.row()]
         self.model.layoutChanged.emit()
         # self.todo_list.clearSelection()
@@ -143,9 +152,6 @@ class MainWindow(QMainWindow):
             with open('./todos.json', 'r') as f:
                 todos_data = json.load(f)
                 self.model.todos = [Todo(todo['text'], todo['completed'], todo['due_date']) for todo in todos_data]
-                for todo in self.model.todos:
-                    if todo.due_date:
-                        self.mark_date(todo.due_date, todo.completed)
         except Exception as e:
             print("Error when loading todos!")
             print(e)
