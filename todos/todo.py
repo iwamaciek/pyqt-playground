@@ -2,7 +2,6 @@ from PyQt5 import QtCore
 
 class Todo:
     def __init__(self, text, completed=False, due_date=None):
-        print(f"Creating Todo: {text}, Completed: {completed}, Due Date: {due_date}")
         self.text = text
         self.completed = completed
         if isinstance(due_date, str):

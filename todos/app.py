@@ -26,7 +26,7 @@ class MainWindow(QMainWindow):
         self.calendar_display.setSelectionMode(QCalendarWidget.NoSelection)
         self.selected_date = None
         self.select_date_button = QPushButton("Select Due Date")
-        self.add_button = QPushButton("Add Todo (With Due Date)")
+        self.add_button = QPushButton("Add Todo")
         self.complete_button = QPushButton("Completed")
         self.edit_button = QPushButton("Edit")
         self.delete_button = QPushButton("Delete")
@@ -62,12 +62,17 @@ class MainWindow(QMainWindow):
         self.edit_button.clicked.connect(self.edit_todo)
         self.delete_button.clicked.connect(self.delete_todo)
 
-    def mark_date(self, date):
+    def mark_date(self, date, status=True):
         format = QtGui.QTextCharFormat()
-        format.setBackground(QtGui.QColor("yellow"))
+        if status:
+            format.setBackground(QtGui.QColor("lightgreen"))
+        else:
+            format.setBackground(QtGui.QColor("lightcoral"))
+        # format.setBackground(QtGui.QColor("yellow"))
         format.setForeground(QtGui.QColor("black"))
         format.setFontWeight(QtGui.QFont.Bold)
         self.calendar_display.setDateTextFormat(date, format)
+        # print(f"Marked date {date.toString(QtCore.Qt.ISODate)} as {status}")
 
     def select_due_date(self):
         dialog = CalendarDialog(self)
@@ -92,6 +97,8 @@ class MainWindow(QMainWindow):
             self.model.layoutChanged.emit()
             self.todo_input.clear()
             self.save_todos()
+            self.selected_date = None
+            self.select_date_button.setText("Select Due Date")
 
     def edit_todo(self):
         # indexes = self.todo_list.selectedIndexes()
@@ -135,20 +142,18 @@ class MainWindow(QMainWindow):
         try:
             with open('./todos.json', 'r') as f:
                 todos_data = json.load(f)
-                print(todos_data)
                 self.model.todos = [Todo(todo['text'], todo['completed'], todo['due_date']) for todo in todos_data]
-                # for todo in self.model.todos:
-                #     if todo.due_date:
-                #         self.mark_date(todo.due_date)
+                for todo in self.model.todos:
+                    if todo.due_date:
+                        self.mark_date(todo.due_date, todo.completed)
         except Exception as e:
+            print("Error when loading todos!")
             print(e)
             self.model.todos = [Todo("Sample Todo 1"), Todo("Sample Todo 2")]
 
     def save_todos(self):
         # Save todos to a json file
         todos_data = [{'text': todo.text, 'completed': todo.completed, 'due_date': todo.due_date.toString(QtCore.Qt.ISODate) if todo.due_date else None} for todo in self.model.todos]
-        for i in range(len(self.model.todos)):
-            print(self.model.todos[i].due_date.toString(QtCore.Qt.ISODate) if self.model.todos[i].due_date else None)
         with open('todos.json', 'w') as f:
             json.dump(todos_data, f)
 
