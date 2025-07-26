@@ -1,1 +1,1 @@
-[{"text": "Sample Todo 1", "completed": false}, {"text": "Sample Todo 2", "completed": true}]
+[{"text": "Sample Todo 1", "completed": false, "due_date": "2025-07-08"}, {"text": "Sample Todo 2", "completed": true, "due_date": null}, {"text": "Hello todos", "completed": false, "due_date": "2025-07-19"}, {"text": "No due date here lalalalal", "completed": true, "due_date": "2025-07-19"}, {"text": "Random todo 1", "completed": true, "due_date": "2025-07-26"}, {"text": "Random todo 2", "completed": true, "due_date": null}]

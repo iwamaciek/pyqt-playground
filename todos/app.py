@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout,
 import PyQt5.QtCore as QtCore
 import PyQt5.QtGui as QtGui
 import sys
+import os
 import json
 
 from todo import Todo
@@ -12,6 +13,7 @@ from calendar_view import CalendarView, CalendarModel
 
 tick = QtGui.QColor("green")
 cross = QtGui.QColor("red")
+current_directory = os.path.dirname(os.path.abspath(__file__))
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -50,7 +52,6 @@ class MainWindow(QMainWindow):
         self.load_todos()
         self.todo_table.setModel(self.model)
         self.todo_table.setSelectionMode(QTableView.SingleSelection)
-        # self.todo_table.setSelectionBehavior(QTableView.SelectRows)
         self.todo_table.resizeColumnsToContents()
 
         self.calendar_data = self.get_calendar_data()
@@ -103,7 +104,6 @@ class MainWindow(QMainWindow):
             self.select_date_button.setText("Select Due Date")
 
     def edit_todo(self):
-        # indexes = self.todo_list.selectedIndexes()
         indexes = self.todo_table.selectedIndexes()
         for index in indexes:
             todo = self.model.todos[index.row()]
@@ -139,7 +139,6 @@ class MainWindow(QMainWindow):
         self.save_todos()
 
     def delete_todo(self):
-        # indexes = self.todo_list.selectedIndexes()
         indexes = self.todo_table.selectedIndexes()
         for index in sorted(indexes, reverse=True):
             todo = self.model.todos[index.row()]
@@ -149,14 +148,13 @@ class MainWindow(QMainWindow):
             del self.model.todos[index.row()]
         self.model.layoutChanged.emit()
         self.todo_table.resizeColumnsToContents()
-        # self.todo_list.clearSelection()
         self.todo_table.clearSelection()
         self.save_todos()
 
     def load_todos(self):
         # Load todos from a json file
         try:
-            with open('./todos.json', 'r') as f:
+            with open(os.path.join(current_directory, 'todos.json'), 'r') as f:
                 todos_data = json.load(f)
                 self.model.todos = [Todo(todo['text'], todo['completed'], todo['due_date']) for todo in todos_data]
         except Exception as e:
@@ -167,7 +165,7 @@ class MainWindow(QMainWindow):
     def save_todos(self):
         # Save todos to a json file
         todos_data = [{'text': todo.text, 'completed': todo.completed, 'due_date': todo.due_date.toString(QtCore.Qt.ISODate) if todo.due_date else None} for todo in self.model.todos]
-        with open('todos.json', 'w') as f:
+        with open(os.path.join(current_directory, 'todos.json'), 'w') as f:
             json.dump(todos_data, f)
 
 if __name__ == "__main__":
