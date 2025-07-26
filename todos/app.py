@@ -16,7 +16,7 @@ cross = QtGui.QColor("red")
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Todo")
+        self.setWindowTitle("Todo App")
 
         self.todo_table = QTableView()
         self.todo_input = QLineEdit()
@@ -50,6 +50,8 @@ class MainWindow(QMainWindow):
         self.load_todos()
         self.todo_table.setModel(self.model)
         self.todo_table.setSelectionMode(QTableView.SingleSelection)
+        # self.todo_table.setSelectionBehavior(QTableView.SelectRows)
+        self.todo_table.resizeColumnsToContents()
 
         self.calendar_data = self.get_calendar_data()
         self.calendar_model = CalendarModel(self.calendar_data)
@@ -92,6 +94,7 @@ class MainWindow(QMainWindow):
             new_todo = Todo(text, due_date=self.selected_date)
             self.model.todos.append(new_todo)
             self.model.layoutChanged.emit()
+            self.todo_table.resizeColumnsToContents()
             self.calendar_model.add_event(self.selected_date.toString(QtCore.Qt.ISODate), new_todo.completed)
             self.calendar_display.refresh()
             self.todo_input.clear()
@@ -110,14 +113,17 @@ class MainWindow(QMainWindow):
                 if new_text:
                     todo.text = new_text
                     self.model.dataChanged.emit(index, index)
+                    self.todo_table.resizeColumnsToContents()
                 new_due_date = editor.get_due_date()
                 if new_due_date:
                     if todo.due_date:
                         self.calendar_model.remove_event(todo.due_date.toString(QtCore.Qt.ISODate), todo.completed)
                     todo.due_date = new_due_date
                     self.model.dataChanged.emit(index, index)
+                    self.todo_table.resizeColumnsToContents()
                     self.calendar_model.add_event(new_due_date.toString(QtCore.Qt.ISODate), todo.completed)
                     self.calendar_display.refresh()
+                self.save_todos()
 
     def complete_todo(self):
         indexes = self.todo_table.selectedIndexes()
@@ -142,6 +148,7 @@ class MainWindow(QMainWindow):
                 self.calendar_display.refresh()
             del self.model.todos[index.row()]
         self.model.layoutChanged.emit()
+        self.todo_table.resizeColumnsToContents()
         # self.todo_list.clearSelection()
         self.todo_table.clearSelection()
         self.save_todos()
